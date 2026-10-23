@@ -1,0 +1,71 @@
+{
+  "entities": {
+    "Match": {
+      "title": "Match",
+      "description": "A sports championship tournament match fixture",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "eventCode": { "type": "string", "maxLength": 64 },
+        "sportId": { "type": "string", "maxLength": 64 },
+        "matchName": { "type": "string", "maxLength": 64 },
+        "date": { "type": "string", "maxLength": 32 },
+        "startTime": { "type": "string", "maxLength": 16 },
+        "matchDurationMin": { "type": "number" },
+        "endTime": { "type": "string", "maxLength": 16 },
+        "eventType": { "type": "string", "maxLength": 32 },
+        "team1Player1": { "type": "string", "maxLength": 128 },
+        "team1Player2": { "type": "string", "maxLength": 128 },
+        "team2Player1": { "type": "string", "maxLength": 128 },
+        "team2Player2": { "type": "string", "maxLength": 128 },
+        "venue": { "type": "string", "maxLength": 128 },
+        "winner": { "type": "string", "maxLength": 128 },
+        "status": { "type": "string", "maxLength": 32 },
+        "scores": { "type": "string", "maxLength": 256 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "eventCode", "sportId", "matchName", "date", "startTime", "team1Player1", "team2Player1", "venue", "status"]
+    },
+    "Player": {
+      "title": "Player",
+      "description": "An athlete, official scorer, or tournament administrator",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 128 },
+        "phoneNumber": { "type": "string", "maxLength": 32 },
+        "teamName": { "type": "string", "maxLength": 128 },
+        "department": { "type": "string", "maxLength": 128 },
+        "jerseyNumber": { "type": "number" },
+        "primarySport": { "type": "string", "maxLength": 64 },
+        "role": { "type": "string", "maxLength": 32 }
+      },
+      "required": ["id", "name", "phoneNumber", "teamName", "role"]
+    },
+    "AppSetting": {
+      "title": "AppSetting",
+      "description": "Application settings and Google Sheet sync state",
+      "type": "object",
+      "properties": {
+        "sheetUrl": { "type": "string", "maxLength": 512 },
+        "lastSynced": { "type": "string", "maxLength": 64 },
+        "syncIntervalSeconds": { "type": "number" },
+        "autoSyncEnabled": { "type": "boolean" }
+      }
+    }
+  },
+  "firestore": {
+    "/matches/{matchId}": {
+      "schema": { "$ref": "#/entities/Match" },
+      "description": "Championship match fixtures and live scores"
+    },
+    "/players/{playerId}": {
+      "schema": { "$ref": "#/entities/Player" },
+      "description": "Athlete roster, scorers, and tournament directors"
+    },
+    "/settings/{settingId}": {
+      "schema": { "$ref": "#/entities/AppSetting" },
+      "description": "Live sync configurations and tournament metadata"
+    }
+  }
+}
