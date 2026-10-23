@@ -2,5 +2,7 @@
   "name": "Khel - Sports Tournament Portal",
   "description": "Comprehensive sports championship management portal with multi-sport live scoring, role-based access, fixture schedules, player stats, and Google Sheets live sync.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
