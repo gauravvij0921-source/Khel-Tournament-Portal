@@ -40,20 +40,7 @@ export const ShareModal: React.FC = () => {
       url: `${baseUrl}?tab=upcoming`,
       icon: Globe,
     },
-    {
-      key: 'gaurav',
-      title: 'Tournament Director & Admin — Gaurav Vij (#7)',
-      desc: 'Opens directly to Gaurav’s Director Console, finals schedule, and live tournament controls.',
-      url: `${baseUrl}?phone=7028296694&tab=upcoming`,
-      icon: ShieldCheck,
-    },
-    {
-      key: 'rohit',
-      title: 'Tournament Director & Admin — Rohit Sardana (#18)',
-      desc: 'Opens directly to Rohit’s Director Console, cricket captain fixtures, and tournament controls.',
-      url: `${baseUrl}?phone=9876543211&tab=upcoming`,
-      icon: ShieldCheck,
-    },
+
 
     {
       key: 'schedule',

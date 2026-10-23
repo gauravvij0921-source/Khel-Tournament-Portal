@@ -105,6 +105,14 @@ export const GoogleSheetsSyncModal: React.FC = () => {
             </div>
           )}
 
+          {/* Sync Behavior Mode Notice */}
+          <div className="flex items-center gap-2.5 p-3 bg-blue-50/80 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/60 rounded-xl text-[11px] text-blue-800 dark:text-blue-300">
+            <RefreshCw className="w-4 h-4 text-blue-500 shrink-0" />
+            <span>
+              <strong>Full Replace Mode Active:</strong> Syncing will completely replace and overwrite the tournament fixtures in Firebase with the exact rows from your sheet (deleting obsolete matches).
+            </span>
+          </div>
+
           {/* URL Input with Normalizer Preview */}
           <div className="space-y-2">
             <label className="block font-bold text-slate-700 dark:text-slate-300">

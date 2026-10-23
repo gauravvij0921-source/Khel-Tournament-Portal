@@ -109,43 +109,82 @@ export async function savePlayerToFirebase(player: Player): Promise<void> {
 
 /**
  * Core flow requested by user:
- * Admin uploads / syncs Google Sheet -> Batch writes all fixtures into Firebase Firestore.
+ * Admin uploads / syncs Google Sheet -> Completely REPLACES the matches in Firebase Firestore
+ * (deletes any matches not in the sheet, updates existing, and creates new).
  * This triggers real-time onSnapshot on every spectator and player device worldwide!
  */
 export async function syncGoogleSheetToFirebase(matches: Match[], players?: Player[]): Promise<number> {
-  const batch = writeBatch(db);
-  let count = 0;
-
-  for (const m of matches) {
-    const ref = doc(db, 'matches', m.id);
-    const sanitized = JSON.parse(JSON.stringify(m));
-    batch.set(ref, {
-      ...sanitized,
-      updatedAt: new Date().toISOString(),
-    }, { merge: true });
-    count++;
-  }
-
-  if (players && players.length > 0) {
-    for (const p of players) {
-      const pRef = doc(db, 'players', p.id);
-      const sanitizedPlayer = JSON.parse(JSON.stringify(p));
-      batch.set(pRef, sanitizedPlayer, { merge: true });
-    }
-  }
-
-  // Update sync settings metadata
-  const settingsRef = doc(db, 'settings', 'general');
-  batch.set(settingsRef, {
-    lastSynced: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-    totalMatches: count,
-  }, { merge: true });
-
   try {
-    await batch.commit();
-    return count;
+    // 1. Fetch all existing match documents currently in Firestore
+    const existingSnap = await getDocs(collection(db, 'matches'));
+    const newMatchIds = new Set(matches.map((m) => m.id));
+
+    const operations: Array<{ type: 'delete' | 'set'; ref: any; data?: any }> = [];
+
+    // 2. Identify matches to delete (in Firestore but not present in the new Google Sheet)
+    existingSnap.forEach((docSnap) => {
+      if (!newMatchIds.has(docSnap.id)) {
+        operations.push({ type: 'delete', ref: docSnap.ref });
+      }
+    });
+
+    // 3. Set all matches from the Google Sheet (pure replacement)
+    for (const m of matches) {
+      const ref = doc(db, 'matches', m.id);
+      const sanitized = JSON.parse(JSON.stringify(m));
+      operations.push({
+        type: 'set',
+        ref,
+        data: {
+          ...sanitized,
+          updatedAt: new Date().toISOString(),
+        },
+      });
+    }
+
+    // 4. If players are provided, write them
+    if (players && players.length > 0) {
+      for (const p of players) {
+        const pRef = doc(db, 'players', p.id);
+        const sanitizedPlayer = JSON.parse(JSON.stringify(p));
+        operations.push({
+          type: 'set',
+          ref: pRef,
+          data: sanitizedPlayer,
+        });
+      }
+    }
+
+    // 5. Update sync metadata in settings
+    const settingsRef = doc(db, 'settings', 'general');
+    operations.push({
+      type: 'set',
+      ref: settingsRef,
+      data: {
+        lastSynced: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        totalMatches: matches.length,
+        syncMode: 'replace',
+      },
+    });
+
+    // 6. Execute in chunks of up to 400 operations to stay well within Firestore 500-op limit
+    const CHUNK_SIZE = 400;
+    for (let i = 0; i < operations.length; i += CHUNK_SIZE) {
+      const chunk = operations.slice(i, i + CHUNK_SIZE);
+      const batch = writeBatch(db);
+      for (const op of chunk) {
+        if (op.type === 'delete') {
+          batch.delete(op.ref);
+        } else {
+          batch.set(op.ref, op.data);
+        }
+      }
+      await batch.commit();
+    }
+
+    return matches.length;
   } catch (err) {
-    handleFirestoreError(err, OperationType.WRITE, 'batch_sync_google_sheets');
+    handleFirestoreError(err, OperationType.WRITE, 'batch_replace_google_sheets');
     throw err;
   }
 }

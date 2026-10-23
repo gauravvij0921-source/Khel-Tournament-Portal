@@ -68,7 +68,7 @@ interface TournamentContextType {
 const STORAGE_KEYS = {
   PLAYERS: 'khel_players_v1',
   MATCHES: 'khel_matches_v1',
-  USER_ID: 'khel_current_user_id_v1',
+  USER_ID: 'khel_current_user_id_v2',
   THEME: 'khel_theme_v1',
   SHEETS_CONFIG: 'khel_sheets_config_v1',
 };
@@ -115,19 +115,20 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     localStorage.setItem(STORAGE_KEYS.PLAYERS, JSON.stringify(allPlayers));
   }, [allPlayers]);
 
-  // Current logged in user
+  // Current logged in user (strictly null by default - NO auto-login, users must sign in via OTP)
   const [currentUser, setCurrentUser] = useState<Player | null>(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('signin') === 'true' || params.get('auth') === 'login') {
-      return null;
-    }
+    // Purge any stale legacy session that defaulted to Gaurav
+    try {
+      localStorage.removeItem('khel_current_user_id_v1');
+    } catch (e) {}
+
     const savedUserId = localStorage.getItem(STORAGE_KEYS.USER_ID);
     if (savedUserId) {
       const found = allPlayers.find((p) => p.id === savedUserId);
       if (found) return found;
     }
-    // Default to Gaurav Vij (Tournament Director & Athlete) to immediately show rich personalized experience
-    return allPlayers.find((p) => p.phoneNumber === '+917028296694') || allPlayers[0] || null;
+    // Default to Guest (null). No user is auto-selected!
+    return null;
   });
 
   useEffect(() => {
@@ -239,27 +240,17 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       } else {
         url.searchParams.delete('sport');
       }
-      if (currentUser?.phoneNumber) {
-        url.searchParams.set('phone', currentUser.phoneNumber.replace(/\D/g, '').slice(-10));
-      }
+      // Always strip out any phone query parameter so phone numbers are NEVER in the URL
+      url.searchParams.delete('phone');
       window.history.replaceState({}, '', url.toString());
     } catch (e) {
       // Ignore if iframe history restrictions
     }
-  }, [activeTab, selectedSportFilter, currentUser]);
+  }, [activeTab, selectedSportFilter]);
 
-  // Initial check for deep-linked match ID or phone in URL params
+  // Initial check for deep-linked match ID in URL params
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const phoneParam = params.get('phone');
-    if (phoneParam) {
-      const last10 = phoneParam.replace(/\D/g, '').slice(-10);
-      const found = allPlayers.find((p) => p.phoneNumber.replace(/\D/g, '').slice(-10) === last10);
-      if (found) {
-        setCurrentUser(found);
-      }
-    }
-
     const matchParam = params.get('match');
     if (matchParam) {
       const targetMatch = matches.find((m) => m.id === matchParam || m.eventCode.toLowerCase() === matchParam.toLowerCase());
@@ -319,6 +310,12 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const logout = () => {
     setCurrentUser(null);
+    localStorage.removeItem(STORAGE_KEYS.USER_ID);
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('phone');
+      window.history.replaceState({}, '', url.toString());
+    } catch (e) {}
   };
 
   // Role Permissions Checking
@@ -472,15 +469,10 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         throw new Error('No matching fixture rows were found in the sheet. Please ensure headers match the template.');
       }
 
-      // Merge matches locally
-      setMatches((prev) => {
-        const map = new Map<string, Match>();
-        prev.forEach((m) => map.set(m.id, m));
-        parsedMatches.forEach((m) => map.set(m.id, m));
-        return Array.from(map.values());
-      });
+      // Replace matches locally (Full Overwrite / Replacement)
+      setMatches(parsedMatches);
 
-      // Core Request: Write / Update Google Sheet schedule directly into Firebase Firestore!
+      // Core Request: Overwrite / Replace Google Sheet schedule directly into Firebase Firestore!
       try {
         await syncGoogleSheetToFirebase(parsedMatches);
       } catch (fbErr) {
@@ -492,13 +484,13 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         ...prev,
         lastSynced: now,
         syncStatus: 'success',
-        syncMessage: `Synchronized ${parsedMatches.length} matches from Google Sheets directly to Firebase cloud at ${now}.`,
+        syncMessage: `Replaced tournament database with ${parsedMatches.length} matches from Google Sheets in Firebase at ${now}.`,
       }));
 
       return {
         success: true,
         count: parsedMatches.length,
-        message: `Synced ${parsedMatches.length} fixtures from Google Sheets into Firebase! All connected user devices updated live.`,
+        message: `Successfully replaced tournament database with ${parsedMatches.length} fixtures from Google Sheets in Firebase! All connected user devices updated live.`,
       };
     } catch (err: any) {
       console.warn('Google Sheets live sync error:', err.message);
@@ -531,16 +523,14 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return () => clearInterval(timer);
   }, [googleSheetsConfig.autoSyncEnabled, googleSheetsConfig.syncIntervalSeconds, googleSheetsConfig.sheetUrl]);
 
-  // Import from custom CSV text
+  // Import from custom CSV text (Full replacement)
   const importMatchesCSV = (csvText: string): number => {
     const parsed = parseMatchesFromCSV(csvText);
     if (parsed.length > 0) {
-      setMatches((prev) => {
-        const map = new Map<string, Match>();
-        prev.forEach((m) => map.set(m.id, m));
-        parsed.forEach((m) => map.set(m.id, m));
-        return Array.from(map.values());
-      });
+      setMatches(parsed);
+      syncGoogleSheetToFirebase(parsed).catch((err) =>
+        console.warn('Firebase batch replace notice:', err)
+      );
     }
     return parsed.length;
   };

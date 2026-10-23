@@ -143,7 +143,7 @@ export const LoginModal: React.FC = () => {
                     type="tel"
                     value={phoneNumber}
                     onChange={(e) => setPhoneNumber(e.target.value)}
-                    placeholder="70282 96694"
+                    placeholder="Enter 10-digit mobile number"
                     className="w-full pl-12 pr-4 py-2.5 text-sm font-semibold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 font-mono tabular-nums"
                     autoFocus
                   />
